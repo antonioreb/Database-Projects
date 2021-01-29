@@ -1,0 +1,50 @@
+LINK DATABASE: mongo "mongodb+srv://tbd.y2kgd.mongodb.net/TBD" --username marcomercier
+
+
+• Quais os artistas que já passaram pela banda do genero Indie rock que lançou os albuns mais longo em média.
+
+
+db.Bands.aggregate([ 
+	{"$match": {"genres":"Indie rock"}}, 
+	{"$project": {
+		"_id":0,
+		"AvgTime": { "$avg": "$albums.time"}, 
+		"name":1 , 
+		"artists.names":1 }}, 
+	{"$sort":{"AvgTime":-1 }}, 
+	{"$limit":1} ]).pretty()
+
+Using mongoDB's aggregate pipeline, the query starts by matching the genre "Indie rock" and for the documents that match projects the average album time, band name and active or inactive band artists names. The last step was to sort the document by descending average album time and limit the output to the first band on the document.
+
+PIPELINE: MATCH ---> PROJECT ---> SORT ---> LIMIT ---> OUTPUT
+
+
+
+
+• Qual é o género musical com mais albuns em cada década?
+
+db.Bands.aggregate([
+	{"$unwind":"$genres"}, 
+	{"$unwind":"$albums"},
+	{"$addFields":{
+		"Year":{"$year": "$albums.release"}}},
+	{"$bucket":{
+		groupBy: "$Year", 
+		boundaries:[1920,1930,1940,1950,1960,1970,1980,1990,2000,2010,2020], 
+		default:"Other", 
+		output: {"genres": {"$push":{"g":"$genres"}} }}},
+	{"$unwind":"$genres"}, 
+	{"$unwind":"$genres.g"}, 
+	{"$group":{ 
+		_id:{"Decade":"$_id", "Genre":"$genres.g" }, 
+		count:{"$sum":1}   }  },
+	{"$sort":{"_id.Decade":1,"count":-1}} , 
+	{"$group":{
+		_id:"$_id.Decade", 
+		"Top genre":{"$first":"$_id.Genre"},
+		"Albums":{"$first":"$count"} }} , 
+	{"$sort":{"_id":1}} ]).pretty()
+	
+MongoDB's pipeline aggregate starts by unwindind the genres and albums arrays, turning each genre and consecutively album a different document. After that the year is extracted from the album release date and a bucket for each decade is created, pushing the genres of each decade into a single "genres" array. The idea then is to count how many unique genres are in each decade and to do that, the genres array needs to be unwinded. The count for Decade/Genre is given by grouping the output by Decade and Genre. Sorting this group makes it possible to get the entries Decade/Genre by the total number of albums and grouping again just by Decade makes it possible to print just the top genre and the number of albums using the $first method to get the top for each decade already sorted.
+
+
